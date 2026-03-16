@@ -6,6 +6,7 @@ import textbook.controller.UEController;
 import textbook.model.Enseignant;
 import textbook.model.Seance;
 import textbook.model.UE;
+import textbook.util.ReportUtil;
 import textbook.util.StyleUtil;
 
 import javax.swing.*;
@@ -16,13 +17,13 @@ import java.awt.event.ActionEvent;
 import java.sql.Date;
 import java.sql.SQLException;
 import java.sql.Time;
+import java.util.ArrayList;
 import java.util.List;
 
 public class SeancePanel extends JPanel {
     private final SeanceController seanceController;
     private final UEController ueController;
     private final EnseignantController enseignantController;
-
 
     private JComboBox<UE> ueComboBox;
     private JComboBox<Enseignant> enseignantComboBox;
@@ -33,7 +34,7 @@ public class SeancePanel extends JPanel {
     private JTextArea resumeArea;
     private JTable seanceTable;
     private DefaultTableModel tableModel;
-
+    private List<Seance> currentSeances = new ArrayList<>();
 
     public SeancePanel() throws SQLException {
         this.seanceController = new SeanceController();
@@ -192,11 +193,11 @@ public class SeancePanel extends JPanel {
         seanceTable.getColumnModel().getColumn(0).setMaxWidth(0);
         seanceTable.getColumnModel().getColumn(0).setWidth(0);
 
-        seanceTable.getColumnModel().getColumn(6).setMinWidth(120);
-        seanceTable.getColumnModel().getColumn(6).setPreferredWidth(120);
+        seanceTable.getColumnModel().getColumn(6).setMinWidth(150);
+        seanceTable.getColumnModel().getColumn(6).setPreferredWidth(150);
 
-        seanceTable.getColumnModel().getColumn(6).setCellRenderer(new ButtonRenderer());
-        seanceTable.getColumnModel().getColumn(6).setCellEditor(new ButtonEditor(new JCheckBox()));
+        seanceTable.getColumnModel().getColumn(6).setCellRenderer(new ActionsRenderer());
+        seanceTable.getColumnModel().getColumn(6).setCellEditor(new ActionsEditor(new JCheckBox()));
 
         JScrollPane scrollPane = new JScrollPane(seanceTable);
         scrollPane.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 230)));
@@ -204,10 +205,20 @@ public class SeancePanel extends JPanel {
 
         JPanel bottomPanel = new JPanel(new BorderLayout());
         bottomPanel.setBackground(StyleUtil.COLOR_WHITE);
+
+        JPanel historyHeader = new JPanel(new BorderLayout());
+        historyHeader.setBackground(StyleUtil.COLOR_WHITE);
         JLabel historyLabel = new JLabel("Historique des Séances");
         historyLabel.setFont(StyleUtil.FONT_HEADER);
         historyLabel.setBorder(new EmptyBorder(10, 0, 10, 0));
-        bottomPanel.add(historyLabel, BorderLayout.NORTH);
+        historyHeader.add(historyLabel, BorderLayout.WEST);
+
+        JButton downloadAllBtn = new JButton("Télécharger tout");
+        StyleUtil.styleButton(downloadAllBtn, StyleUtil.COLOR_PRIMARY);
+        downloadAllBtn.addActionListener(e -> ReportUtil.exportAllSeances(this, currentSeances));
+        historyHeader.add(downloadAllBtn, BorderLayout.EAST);
+
+        bottomPanel.add(historyHeader, BorderLayout.NORTH);
         bottomPanel.add(scrollPane, BorderLayout.CENTER);
 
         JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, topPanel, bottomPanel);
@@ -294,8 +305,8 @@ public class SeancePanel extends JPanel {
     private void refreshTable() {
         tableModel.setRowCount(0);
         try {
-            List<Seance> seances = seanceController.loadSeances();
-            for (Seance s : seances) {
+            currentSeances = seanceController.loadSeances();
+            for (Seance s : currentSeances) {
                 tableModel.addRow(new Object[] { s.getIdSeance(), s.getDateSeance().toString(), s.getUeIntitule(),
                         s.getEnseignantNomComplet(), s.getSalle(), s.getResume(), "" });
             }
@@ -304,16 +315,19 @@ public class SeancePanel extends JPanel {
         }
     }
 
-    class ButtonRenderer extends JPanel implements javax.swing.table.TableCellRenderer {
-        private JButton button;
+    class ActionsRenderer extends JPanel implements javax.swing.table.TableCellRenderer {
+        private JButton viewBtn = new JButton("Voir");
+        private JButton delBtn = new JButton("Suppr");
 
-        public ButtonRenderer() {
+        public ActionsRenderer() {
             setOpaque(true);
-            setLayout(new FlowLayout(FlowLayout.CENTER, 0, 2));
-            button = new JButton("Supprimer");
-            StyleUtil.styleButton(button, StyleUtil.COLOR_DANGER);
-            button.setFont(new Font("Segoe UI", Font.BOLD, 10));
-            add(button);
+            setLayout(new FlowLayout(FlowLayout.CENTER, 5, 2));
+            StyleUtil.styleButton(viewBtn, StyleUtil.COLOR_PRIMARY);
+            StyleUtil.styleButton(delBtn, StyleUtil.COLOR_DANGER);
+            viewBtn.setFont(new Font("Segoe UI", Font.BOLD, 10));
+            delBtn.setFont(new Font("Segoe UI", Font.BOLD, 10));
+            add(viewBtn);
+            add(delBtn);
         }
 
         @Override
@@ -324,33 +338,45 @@ public class SeancePanel extends JPanel {
         }
     }
 
-    class ButtonEditor extends DefaultCellEditor {
+    class ActionsEditor extends DefaultCellEditor {
         private JPanel panel;
-        private JButton button;
+        private JButton viewBtn;
+        private JButton delBtn;
         private int currentRow;
 
-        public ButtonEditor(JCheckBox checkBox) {
+        public ActionsEditor(JCheckBox checkBox) {
             super(checkBox);
-            panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 2));
+            panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 2));
             panel.setOpaque(true);
-            button = new JButton("Supprimer");
-            StyleUtil.styleButton(button, StyleUtil.COLOR_DANGER);
-            button.setFont(new Font("Segoe UI", Font.BOLD, 10));
-            panel.add(button);
+            viewBtn = new JButton("Voir");
+            delBtn = new JButton("Suppr");
 
-            button.addActionListener(e -> {
+            StyleUtil.styleButton(viewBtn, StyleUtil.COLOR_PRIMARY);
+            StyleUtil.styleButton(delBtn, StyleUtil.COLOR_DANGER);
+            viewBtn.setFont(new Font("Segoe UI", Font.BOLD, 10));
+            delBtn.setFont(new Font("Segoe UI", Font.BOLD, 10));
+
+            viewBtn.addActionListener(e -> {
+                ReportUtil.showSeanceDetails(SeancePanel.this, currentSeances.get(currentRow));
+                fireEditingStopped();
+            });
+
+            delBtn.addActionListener(e -> {
                 int id = (int) seanceTable.getValueAt(currentRow, 0);
-                if (JOptionPane.showConfirmDialog(button, "Supprimer le rapport ?", "Confirmation",
+                if (JOptionPane.showConfirmDialog(panel, "Supprimer le rapport ?", "Confirmation",
                         JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
                     try {
                         seanceController.deleteSeance(id);
                         refreshTable();
                     } catch (Exception ex) {
-                        JOptionPane.showMessageDialog(button, "Erreur : " + ex.getMessage());
+                        JOptionPane.showMessageDialog(panel, "Erreur : " + ex.getMessage());
                     }
                 }
                 fireEditingStopped();
             });
+
+            panel.add(viewBtn);
+            panel.add(delBtn);
         }
 
         @Override

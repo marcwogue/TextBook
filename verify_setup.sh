@@ -1,7 +1,7 @@
 #!/bin/bash
 # Script de vérification pour TextBook
 
-PROJECT_DIR="TextBook"
+PROJECT_DIR="textbook"
 LIB_DIR="$PROJECT_DIR/lib"
 SRC_DIR="$PROJECT_DIR/src"
 BIN_DIR="$PROJECT_DIR/bin"
