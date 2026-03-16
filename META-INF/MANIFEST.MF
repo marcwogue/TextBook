@@ -1,0 +1,5 @@
+Manifest-Version: 1.0
+Main-Class: textbook.app.Main
+Class-Path: textbook/lib/postgresql-42.7.3.jar
+Created-By: 21.0.10 (Arch Linux)
+

@@ -1,3 +1,5 @@
+1- bad
+2- 
 
 
 # 1. Vue globale de l’architecture
